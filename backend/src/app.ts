@@ -42,3 +42,5 @@ app.use('/api/stock-requests', stockRequestsRouter);
 
 app.use(notFound);
 app.use(errorHandler);
+
+export default app;

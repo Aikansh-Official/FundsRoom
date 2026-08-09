@@ -7,6 +7,10 @@ export const pool = mysql.createPool({
   database: env.dbName,
   user: env.dbUser,
   password: env.dbPassword,
+  ssl: env.dbSsl ? {
+    rejectUnauthorized: true,
+    ...(env.dbSslCaBase64 ? { ca: Buffer.from(env.dbSslCaBase64, 'base64').toString('utf8') } : {}),
+  } : undefined,
   waitForConnections: true,
   connectionLimit: 10,
 });

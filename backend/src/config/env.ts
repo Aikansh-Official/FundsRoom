@@ -20,6 +20,8 @@ export const env = {
   dbName: process.env.DB_NAME?.trim() || 'fundsroom',
   dbUser: process.env.DB_USER?.trim() || 'root',
   dbPassword: process.env.DB_PASSWORD ?? '',
+  dbSsl: process.env.DB_SSL?.trim().toLowerCase() === 'true',
+  dbSslCaBase64: process.env.DB_SSL_CA_BASE64?.trim() || '',
   jwtSecret: process.env.JWT_SECRET?.trim() || 'development-only-secret-change-me',
   clientOrigin: process.env.CLIENT_ORIGIN ?? 'http://localhost:5173',
   jwtIssuer: process.env.JWT_ISSUER?.trim() || 'fundsroom-api',
