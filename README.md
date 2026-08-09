@@ -22,6 +22,24 @@ The customer workspace also keeps follow-up notes, customer queries, query statu
 
 See [SECURITY.md](SECURITY.md) for the role-permission matrix, threat model, implemented controls, and production hardening checklist.
 
+## Deployment
+
+- [Live frontend on Vercel](https://frontend-mrr91ipay-aikanshkatiyar-gmailcoms-projects.vercel.app/)
+- [Backend deployment on Vercel](https://backend-8lgs3kexf-aikanshkatiyar-gmailcoms-projects.vercel.app/)
+- [GitHub repository](https://github.com/Aikansh-Official/FundsRoom)
+
+The frontend is deployed and available at the link above. The backend deployment is ready for production environment variables, including a managed MySQL connection. A local MySQL server at `localhost` cannot be reached by Vercel serverless functions; set the backend's `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET`, and `CLIENT_ORIGIN` values in Vercel before enabling live sign-in.
+
+## Screenshots
+
+![Sales overview](docs/screenshots/sales-overview.png)
+
+![Sales products and inventory](docs/screenshots/sales-products.png)
+
+![Warehouse overview](docs/screenshots/warehouse-overview.png)
+
+For a print-ready version with full-page screenshots and clickable links, see [README-FundsRoom.pdf](output/pdf/README-FundsRoom.pdf).
+
 ## Feature inventory
 
 ### Authentication and roles
