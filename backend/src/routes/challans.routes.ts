@@ -36,7 +36,7 @@ type ProductSnapshot = {
 export const challansRouter = Router();
 challansRouter.use(authenticate);
 
-challansRouter.get('/', async (req, res) => {
+challansRouter.get('/', requireRoles('ADMIN', 'SALES', 'WAREHOUSE', 'ACCOUNTS'), async (req, res) => {
   const { page, limit, offset } = parsePagination(req.query);
   const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
   const status = z.enum(['DRAFT', 'CONFIRMED', 'CANCELLED']).optional().safeParse(req.query.status).data;
@@ -72,7 +72,13 @@ challansRouter.get('/export.csv', requireRoles('ADMIN', 'SALES', 'ACCOUNTS'), as
        AND ($2 IS NULL OR c.status = $2) ORDER BY c.created_at DESC`,
     [search, status ?? null],
   );
-  const escape = (value: unknown) => `"${String(value ?? '').replaceAll('"', '""')}"`;
+  const escape = (value: unknown) => {
+    const text = String(value ?? '');
+    // Prevent spreadsheet formula injection when a user-controlled name starts
+    // with a formula trigger such as =, +, -, or @.
+    const safeText = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+    return `"${safeText.replaceAll('"', '""')}"`;
+  };
   const header = ['Challan', 'Customer', 'Business', 'Status', 'Units', 'Created', 'Created by'];
   const lines = [header, ...result.rows.map((row) => [row.challanNumber, row.customerName, row.businessName, row.status, row.totalQuantity, row.createdAt, row.createdBy])]
     .map((line) => line.map(escape).join(','));
@@ -118,7 +124,7 @@ challansRouter.post('/', requireRoles('ADMIN', 'SALES'), async (req, res) => {
   return res.status(201).json({ data });
 });
 
-challansRouter.get('/:challanId', async (req, res) => {
+challansRouter.get('/:challanId', requireRoles('ADMIN', 'SALES', 'WAREHOUSE', 'ACCOUNTS'), async (req, res) => {
   const challan = await query(
     `SELECT c.id, c.challan_number AS "challanNumber", c.total_quantity AS "totalQuantity", c.status,
             c.created_at AS "createdAt", c.confirmed_at AS "confirmedAt", cu.id AS "customerId", cu.customer_name AS "customerName",

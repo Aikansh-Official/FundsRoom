@@ -46,23 +46,38 @@ function syncNotifications() {
   return syncInFlight;
 }
 
-notificationsRouter.get('/', async (_req, res) => {
+notificationsRouter.get('/', async (req, res) => {
   await syncNotifications();
   const result = await query<NotificationRow>(
-    `SELECT id, type, title, detail, priority, read_at AS "readAt", created_at AS "createdAt"
-     FROM notifications ORDER BY (read_at IS NULL) DESC, created_at DESC LIMIT 30`,
+    `SELECT n.id, n.type, n.title, n.detail, n.priority, nr.read_at AS "readAt", n.created_at AS "createdAt"
+     FROM notifications n
+     LEFT JOIN notification_reads nr ON nr.notification_id = n.id AND nr.user_id = $1
+     ORDER BY (nr.notification_id IS NULL) DESC, n.created_at DESC LIMIT 30`,
+    [req.user!.id],
   );
-  const unread = await query<{ total: string }>('SELECT COUNT(*) AS total FROM notifications WHERE read_at IS NULL');
+  const unread = await query<{ total: string }>(
+    `SELECT COUNT(*) AS total FROM notifications n
+     LEFT JOIN notification_reads nr ON nr.notification_id = n.id AND nr.user_id = $1
+     WHERE nr.notification_id IS NULL`, [req.user!.id],
+  );
   return res.json({ data: result.rows, unreadCount: Number(unread.rows[0].total) });
 });
 
-notificationsRouter.patch('/read-all', async (_req, res) => {
-  await query('UPDATE notifications SET read_at = COALESCE(read_at, NOW()) WHERE read_at IS NULL');
+notificationsRouter.patch('/read-all', async (req, res) => {
+  await query(
+    `INSERT INTO notification_reads (notification_id, user_id)
+     SELECT id, $1 FROM notifications
+     ON DUPLICATE KEY UPDATE read_at = notification_reads.read_at`, [req.user!.id],
+  );
   return res.json({ data: { updated: true } });
 });
 
 notificationsRouter.patch('/:notificationId/read', async (req, res) => {
-  const result = await query('UPDATE notifications SET read_at = COALESCE(read_at, NOW()) WHERE id = $1', [req.params.notificationId]);
-  if ((result.rows[0] as unknown as { affectedRows: number }).affectedRows === 0) return res.status(404).json({ message: 'Notification not found.' });
+  const notification = await query('SELECT id FROM notifications WHERE id = $1', [req.params.notificationId]);
+  if (!notification.rows[0]) return res.status(404).json({ message: 'Notification not found.' });
+  await query(
+    `INSERT INTO notification_reads (notification_id, user_id) VALUES ($1, $2)
+     ON DUPLICATE KEY UPDATE read_at = notification_reads.read_at`, [req.params.notificationId, req.user!.id],
+  );
   return res.json({ data: { id: req.params.notificationId, read: true } });
 });

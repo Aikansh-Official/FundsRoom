@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Bell, Boxes, ChevronRight, ClipboardList, Download, LayoutDashboard, LogOut, Package, Search, Users } from 'lucide-react';
-import { api, apiRequest, downloadFile, login, type Session } from './lib/api';
+import { api, apiRequest, downloadFile, login, type Role, type Session } from './lib/api';
 import { Workspace } from './Workspace';
 
 type ChallanSummary = { id: string; challanNumber: string; status: string; customerName: string; createdAt: string };
@@ -9,11 +9,34 @@ type AnalyticsDetail = { saleDate: string; challanNumber: string; sellerName: st
 type Analytics = { data: { days: number; daily: Array<{ saleDate: string; challans: number; revenue: number; units: number }>; byUser: Array<{ userId: string; userName: string; challans: number; revenue: number; units: number }>; details: AnalyticsDetail[] } };
 type Notification = { id: string; type: string; title: string; detail: string; priority: string; readAt: string | null; createdAt: string };
 
-const nav = [{ label: 'Overview', icon: LayoutDashboard }, { label: 'Customers', icon: Users }, { label: 'Products', icon: Package }, { label: 'Stock movements', icon: Boxes }, { label: 'Challans', icon: ClipboardList }];
+const nav: Array<{ label: string; icon: typeof LayoutDashboard; roles: Role[] }> = [
+  { label: 'Overview', icon: LayoutDashboard, roles: ['ADMIN', 'SALES', 'WAREHOUSE', 'ACCOUNTS'] },
+  { label: 'Customers', icon: Users, roles: ['ADMIN', 'SALES'] },
+  { label: 'Products', icon: Package, roles: ['ADMIN', 'SALES', 'WAREHOUSE'] },
+  { label: 'Stock movements', icon: Boxes, roles: ['ADMIN', 'SALES', 'WAREHOUSE'] },
+  { label: 'Challans', icon: ClipboardList, roles: ['ADMIN', 'SALES', 'WAREHOUSE', 'ACCOUNTS'] },
+];
 const money = (value: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(value));
 
+function readStoredSession(): Session | null {
+  try {
+    const raw = localStorage.getItem('stockflow-session');
+    if (!raw) return null;
+    const candidate = JSON.parse(raw) as Session;
+    const validRoles: Role[] = ['ADMIN', 'SALES', 'WAREHOUSE', 'ACCOUNTS'];
+    if (!candidate?.token || typeof candidate.token !== 'string' || !candidate.user?.name || !candidate.user.email || !validRoles.includes(candidate.user.role)) {
+      localStorage.removeItem('stockflow-session');
+      return null;
+    }
+    return candidate;
+  } catch {
+    localStorage.removeItem('stockflow-session');
+    return null;
+  }
+}
+
 export function App() {
-  const [session, setSession] = useState<Session | null>(() => { const raw = localStorage.getItem('stockflow-session'); return raw ? JSON.parse(raw) : null; });
+  const [session, setSession] = useState<Session | null>(readStoredSession);
   const [dashboard, setDashboard] = useState<Dashboard['data'] | null>(null);
   const [analytics, setAnalytics] = useState<Analytics['data'] | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -36,26 +59,29 @@ export function App() {
   }
 
   useEffect(() => { refreshWorkspace(); const timer = window.setInterval(refreshWorkspace, 30000); return () => window.clearInterval(timer); }, [session]);
+  useEffect(() => { const expire = () => setSession(null); window.addEventListener('stockflow-auth-expired', expire); return () => window.removeEventListener('stockflow-auth-expired', expire); }, []);
   if (!session) return <Login onSuccess={(next) => { localStorage.setItem('stockflow-session', JSON.stringify(next)); setSession(next); }} />;
+  const visibleNav = nav.filter((item) => item.roles.includes(session.user.role));
+  const canCreateChallan = session.user.role === 'ADMIN' || session.user.role === 'SALES';
 
   return <main className="shell">
     <aside className="sidebar"><div className="brand"><span className="brand-mark">S</span><span>Stockflow</span></div><p className="workspace">OPERATIONS PORTAL</p>
-      <nav>{nav.map(({ label, icon: Icon }) => <button key={label} className={active === label ? 'nav-item active' : 'nav-item'} onClick={() => setActive(label)}><Icon size={18}/><span>{label}</span></button>)}</nav>
+      <nav>{visibleNav.map(({ label, icon: Icon }) => <button key={label} className={active === label ? 'nav-item active' : 'nav-item'} onClick={() => setActive(label)}><Icon size={18}/><span>{label}</span></button>)}</nav>
       <div className="profile"><span className="avatar">{session.user.name[0]}</span><div><b>{session.user.name}</b><small>{session.user.role.toLowerCase()}</small></div><button aria-label="Sign out" onClick={() => { localStorage.removeItem('stockflow-session'); setSession(null); }}><LogOut size={17}/></button></div>
     </aside>
-    <section className="content"><header><div><p className="eyebrow">Good morning, {session.user.name.split(' ')[0]}</p><h1>{active === 'Overview' ? 'Operations at a glance' : active}</h1></div><div className="header-actions"><div className="notification-wrap"><button className="icon-button" aria-label={`Notifications${unreadCount ? ` (${unreadCount} unread)` : ''}`} aria-expanded={showNotifications} onClick={() => setShowNotifications((shown) => !shown)}><Bell size={19}/>{unreadCount > 0 && <i/>}</button>{showNotifications && <NotificationPanel notifications={notifications} unreadCount={unreadCount} token={session.token} close={() => setShowNotifications(false)} refresh={refreshWorkspace} />}</div><button className="new-button" onClick={() => setShowChallan(true)}>+ New challan</button></div></header>
+    <section className="content"><header><div><p className="eyebrow">Good morning, {session.user.name.split(' ')[0]}</p><h1>{active === 'Overview' ? 'Operations at a glance' : active}</h1></div><div className="header-actions"><div className="notification-wrap"><button className="icon-button" aria-label={`Notifications${unreadCount ? ` (${unreadCount} unread)` : ''}`} aria-expanded={showNotifications} onClick={() => setShowNotifications((shown) => !shown)}><Bell size={19}/>{unreadCount > 0 && <i/>}</button>{showNotifications && <NotificationPanel notifications={notifications} unreadCount={unreadCount} token={session.token} close={() => setShowNotifications(false)} refresh={refreshWorkspace} />}</div>{canCreateChallan && <button className="new-button" onClick={() => setShowChallan(true)}>+ New challan</button>}</div></header>
       {error && <p className="error">{error}</p>}
       {active === 'Overview' && <DashboardView dashboard={dashboard} analytics={analytics} token={session.token} />}
-      {active !== 'Overview' && <Workspace section={active} token={session.token} />}
-      {showChallan && <NewChallan token={session.token} onClose={() => setShowChallan(false)} onCreated={() => { setShowChallan(false); refreshWorkspace(); }} />}
+      {active !== 'Overview' && <Workspace section={active} token={session.token} role={session.user.role} />}
+      {showChallan && canCreateChallan && <NewChallan token={session.token} onClose={() => setShowChallan(false)} onCreated={() => { setShowChallan(false); refreshWorkspace(); }} />}
     </section>
   </main>;
 }
 
 function Login({ onSuccess }: { onSuccess: (session: Session) => void }) {
-  const [email, setEmail] = useState('sales@stockflow.test'); const [password, setPassword] = useState('FundsRoom@123'); const [error, setError] = useState(''); const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState(import.meta.env.DEV ? 'sales@stockflow.test' : ''); const [password, setPassword] = useState(import.meta.env.DEV ? 'FundsRoom@123' : ''); const [error, setError] = useState(''); const [loading, setLoading] = useState(false);
   async function submit(event: React.FormEvent) { event.preventDefault(); setLoading(true); setError(''); try { onSuccess(await login(email, password)); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to sign in.'); } finally { setLoading(false); } }
-  return <main className="login-page"><section className="login-copy"><span className="brand-mark">S</span><p className="eyebrow">WHOLESALE OPERATIONS</p><h1>Every order has a story.<br/>Keep it moving.</h1><p>Stockflow keeps sales, customers, and inventory in one calm, reliable workspace.</p><div className="ornament">01&nbsp;&nbsp; Customer to challan<br/>02&nbsp;&nbsp; Challan to stock movement</div></section><section className="login-panel"><form onSubmit={submit}><p className="eyebrow">WELCOME BACK</p><h2>Sign in to Stockflow</h2><p className="hint">Use the Sales account to explore the live demo.</p><label>Email<input value={email} onChange={(event) => setEmail(event.target.value)} type="email" /></label><label>Password<input value={password} onChange={(event) => setPassword(event.target.value)} type="password" /></label>{error && <p className="error">{error}</p>}<button className="login-button" disabled={loading}>{loading ? 'Signing in...' : 'Enter workspace'} <ChevronRight size={18}/></button><p className="demo">Demo password: <b>FundsRoom@123</b></p></form></section></main>;
+  return <main className="login-page"><section className="login-copy"><span className="brand-mark">S</span><p className="eyebrow">WHOLESALE OPERATIONS</p><h1>Every order has a story.<br/>Keep it moving.</h1><p>Stockflow keeps sales, customers, and inventory in one calm, reliable workspace.</p><div className="ornament">01&nbsp;&nbsp; Customer to challan<br/>02&nbsp;&nbsp; Challan to stock movement</div></section><section className="login-panel"><form onSubmit={submit}><p className="eyebrow">WELCOME BACK</p><h2>Sign in to Stockflow</h2><p className="hint">{import.meta.env.DEV ? 'Use the local Sales account to explore the demo.' : 'Use the account assigned to you by your administrator.'}</p><label>Email<input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="username" /></label><label>Password<input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="current-password" /></label>{error && <p className="error">{error}</p>}<button className="login-button" disabled={loading}>{loading ? 'Signing in...' : 'Enter workspace'} <ChevronRight size={18}/></button>{import.meta.env.DEV && <p className="demo">Local demo password: <b>FundsRoom@123</b></p>}</form></section></main>;
 }
 
 function DashboardView(props: { dashboard: Dashboard['data'] | null; analytics: Analytics['data'] | null; token: string }) {

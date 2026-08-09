@@ -20,6 +20,8 @@ The portal covers the complete path from a customer relationship to a confirmed 
 
 The customer workspace also keeps follow-up notes, customer queries, query status, priorities, and reviews together so a relationship is not reduced to a single row in a table.
 
+See [SECURITY.md](SECURITY.md) for the role-permission matrix, threat model, implemented controls, and production hardening checklist.
+
 ## Feature inventory
 
 ### Authentication and roles

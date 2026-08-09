@@ -13,7 +13,7 @@ const customerSchema = z.object({
   businessName: z.string().trim().min(2).max(180),
   gstNumber: z.string().trim().max(30).nullable().optional(),
   customerType: z.enum(['RETAIL', 'WHOLESALE', 'DISTRIBUTOR']),
-  address: z.string().trim().min(5),
+  address: z.string().trim().min(5).max(1000),
   status: z.enum(['LEAD', 'ACTIVE', 'INACTIVE']).default('LEAD'),
   followUpDate: z.string().date().nullable().optional(),
 });
@@ -28,7 +28,7 @@ const reviewSchema = z.object({ rating: z.coerce.number().int().min(1).max(5), r
 export const customersRouter = Router();
 customersRouter.use(authenticate);
 
-customersRouter.get('/', async (req, res) => {
+customersRouter.get('/', requireRoles('ADMIN', 'SALES'), async (req, res) => {
   const { page, limit, offset } = parsePagination(req.query);
   const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
   const result = await query(
@@ -60,7 +60,7 @@ customersRouter.post('/', requireRoles('ADMIN', 'SALES'), async (req, res) => {
   return res.status(201).json({ data: result.rows[0] });
 });
 
-customersRouter.get('/:customerId', async (req, res) => {
+customersRouter.get('/:customerId', requireRoles('ADMIN', 'SALES'), async (req, res) => {
   const customer = await query(
     `SELECT id, customer_name AS "customerName", mobile, email, business_name AS "businessName", gst_number AS "gstNumber",
             customer_type AS "customerType", address, status, follow_up_date AS "followUpDate", created_at AS "createdAt", updated_at AS "updatedAt"
@@ -103,7 +103,7 @@ customersRouter.post('/:customerId/follow-ups', requireRoles('ADMIN', 'SALES'), 
   return res.status(201).json({ data: result.rows[0] });
 });
 
-customersRouter.get('/:customerId/queries', async (req, res) => {
+customersRouter.get('/:customerId/queries', requireRoles('ADMIN', 'SALES'), async (req, res) => {
   const result = await query(`SELECT id, subject, message, status, priority, created_at AS "createdAt", resolved_at AS "resolvedAt" FROM customer_queries WHERE customer_id = $1 ORDER BY created_at DESC`, [req.params.customerId]);
   return res.json({ data: result.rows });
 });
@@ -120,7 +120,7 @@ customersRouter.patch('/:customerId/queries/:queryId/resolve', requireRoles('ADM
   return res.json({ data: (await query(`SELECT id, status, resolved_at AS "resolvedAt" FROM customer_queries WHERE id = $1`, [req.params.queryId])).rows[0] });
 });
 
-customersRouter.get('/:customerId/reviews', async (req, res) => {
+customersRouter.get('/:customerId/reviews', requireRoles('ADMIN', 'SALES'), async (req, res) => {
   const result = await query(`SELECT r.id, r.rating, r.review, r.created_at AS "createdAt", u.name AS "createdBy" FROM customer_reviews r JOIN users u ON u.id = r.created_by WHERE r.customer_id = $1 ORDER BY r.created_at DESC`, [req.params.customerId]);
   return res.json({ data: result.rows });
 });

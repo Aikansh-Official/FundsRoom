@@ -25,7 +25,7 @@ const stockAdjustmentSchema = z.object({
 export const productsRouter = Router();
 productsRouter.use(authenticate);
 
-productsRouter.get('/', async (req, res) => {
+productsRouter.get('/', requireRoles('ADMIN', 'SALES', 'WAREHOUSE'), async (req, res) => {
   const { page, limit, offset } = parsePagination(req.query);
   const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
   const lowStockOnly = req.query.lowStock === 'true';
@@ -110,7 +110,7 @@ productsRouter.post('/:productId/stock-movements', requireRoles('ADMIN', 'WAREHO
   return res.status(201).json({ data });
 });
 
-productsRouter.get('/:productId/stock-movements', async (req, res) => {
+productsRouter.get('/:productId/stock-movements', requireRoles('ADMIN', 'SALES', 'WAREHOUSE'), async (req, res) => {
   const { page, limit, offset } = parsePagination(req.query);
   const product = await query('SELECT id FROM products WHERE id = $1', [req.params.productId]);
   if (!product.rows[0]) throw new HttpError(404, 'Product not found.');
