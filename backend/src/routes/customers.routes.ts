@@ -121,7 +121,7 @@ customersRouter.patch('/:customerId/queries/:queryId/resolve', requireRoles('ADM
 });
 
 customersRouter.get('/:customerId/reviews', async (req, res) => {
-  const result = await query(`SELECT id, rating, review, created_at AS "createdAt", u.name AS "createdBy" FROM customer_reviews r JOIN users u ON u.id = r.created_by WHERE r.customer_id = $1 ORDER BY r.created_at DESC`, [req.params.customerId]);
+  const result = await query(`SELECT r.id, r.rating, r.review, r.created_at AS "createdAt", u.name AS "createdBy" FROM customer_reviews r JOIN users u ON u.id = r.created_by WHERE r.customer_id = $1 ORDER BY r.created_at DESC`, [req.params.customerId]);
   return res.json({ data: result.rows });
 });
 

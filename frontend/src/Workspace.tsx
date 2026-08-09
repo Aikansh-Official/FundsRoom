@@ -24,7 +24,82 @@ function Customers({ token }: {token:string}) {
 
 function CustomerForm({token,close,saved}:{token:string;close:()=>void;saved:()=>void}) { const [form,setForm]=useState({customerName:'',businessName:'',mobile:'',email:'',customerType:'WHOLESALE',status:'LEAD',address:'',gstNumber:'',followUpDate:''}); const [error,setError]=useState(''); const set=(key:string,value:string)=>setForm({...form,[key]:value}); async function submit(e:React.FormEvent){e.preventDefault();try{await apiRequest('/api/customers',token,'POST',{...form,email:form.email||null,gstNumber:form.gstNumber||null,followUpDate:form.followUpDate||null});saved()}catch(err){setError(err instanceof Error?err.message:'Unable to save customer')}} return <Modal title="Add customer" close={close}><form className="form-grid" onSubmit={submit}>{[['customerName','Customer name'],['businessName','Business name'],['mobile','Mobile'],['email','Email'],['gstNumber','GST number'],['followUpDate','Follow-up date']].map(([key,label])=><label key={key}>{label}<input type={key==='followUpDate'?'date':key==='email'?'email':'text'} value={(form as any)[key]} onChange={e=>set(key,e.target.value)}/></label>)}<label>Customer type<select value={form.customerType} onChange={e=>set('customerType',e.target.value)}><option>RETAIL</option><option>WHOLESALE</option><option>DISTRIBUTOR</option></select></label><label>Status<select value={form.status} onChange={e=>set('status',e.target.value)}><option>LEAD</option><option>ACTIVE</option><option>INACTIVE</option></select></label><label className="wide">Address<textarea required value={form.address} onChange={e=>set('address',e.target.value)}/></label>{error&&<p className="error wide">{error}</p>}<div className="form-actions wide"><button type="button" onClick={close}>Cancel</button><button className="new-button">Save customer</button></div></form></Modal> }
 
-function CustomerDetail({customer,token}:{customer:Customer;token:string}) { const [tab,setTab]=useState('Timeline'); const [items,setItems]=useState<any[]>([]); const [text,setText]=useState(''); const [rating,setRating]=useState('5'); const [error,setError]=useState(''); const load=()=>{const path=tab==='Queries'?`/api/customers/${customer.id}/queries`:tab==='Reviews'?`/api/customers/${customer.id}/reviews`:`/api/customers/${customer.id}`;api<any>(path,token).then(r=>setItems(tab==='Timeline'?r.data.followUps||[]:r.data)).catch(e=>setError(e.message))};useEffect(load,[tab,customer.id]);async function add(){if(!text.trim())return;try{await apiRequest(tab==='Queries'?`/api/customers/${customer.id}/queries`:`/api/customers/${customer.id}/reviews`,token,'POST',tab==='Queries'?{subject:'Customer query',message:text,priority:'MEDIUM'}:{rating:Number(rating),review:text});setText('');load()}catch(e){setError(e instanceof Error?e.message:'Unable to save.')}} return <section className="detail-card"><p className="eyebrow">CUSTOMER PROFILE</p><h2>{customer.customerName}</h2><p className="muted">{customer.businessName} · {customer.mobile}</p><div className="tabs">{['Timeline','Queries','Reviews'].map(t=><button className={tab===t?'selected':''} onClick={()=>{setTab(t);setError('')}} key={t}>{t}</button>)}</div>{error&&<p className="error">{error}</p>}<div className="detail-list">{items.map((item:any)=><article key={item.id}><div><b>{tab==='Queries'?item.subject:tab==='Reviews'?`${'★'.repeat(item.rating)} review`:'Follow-up note'}</b><small>{item.createdAt?new Date(item.createdAt).toLocaleString():''}</small></div><p>{item.note||item.message||item.review}</p>{tab==='Queries'&&item.status!=='RESOLVED'&&<button onClick={()=>apiRequest(`/api/customers/${customer.id}/queries/${item.id}/resolve`,token,'PATCH').then(load)}>Resolve query</button>}</article>)}{items.length===0&&<p className="muted">No {tab.toLowerCase()} recorded yet.</p>}</div><div className="composer">{tab==='Reviews'&&<select value={rating} onChange={e=>setRating(e.target.value)}><option value="5">5 stars</option><option value="4">4 stars</option><option value="3">3 stars</option><option value="2">2 stars</option><option value="1">1 star</option></select>}<textarea value={text} onChange={e=>setText(e.target.value)} placeholder={tab==='Queries'?'Log a customer question or request...':tab==='Reviews'?'Write a customer review...':'Log a follow-up note...'}/><button className="new-button" onClick={()=>tab==='Timeline'?apiRequest(`/api/customers/${customer.id}/follow-ups`,token,'POST',{note:text}).then(()=>{setText('');load()}):add()}>{tab==='Queries'?'Log query':tab==='Reviews'?'Add review':'Add note'}</button></div></section> }
+function CustomerDetail({customer,token}:{customer:Customer;token:string}) {
+  const [tab,setTab]=useState('Timeline');
+  const [items,setItems]=useState<any[]>([]);
+  const [text,setText]=useState('');
+  const [rating,setRating]=useState('5');
+  const [error,setError]=useState('');
+
+  const pathFor = (currentTab:string) => currentTab === 'Queries'
+    ? `/api/customers/${customer.id}/queries`
+    : currentTab === 'Reviews'
+      ? `/api/customers/${customer.id}/reviews`
+      : `/api/customers/${customer.id}`;
+
+  const loadCurrent = async (currentTab = tab) => {
+    const result = await api<any>(pathFor(currentTab),token);
+    const data = currentTab === 'Timeline' ? result.data?.followUps ?? [] : result.data ?? [];
+    return Array.isArray(data) ? data : [];
+  };
+
+  useEffect(() => {
+    // Clear the previous tab immediately. This prevents a query or timeline
+    // response from remaining visible while Reviews is loading.
+    setItems([]);
+    setError('');
+    setText('');
+    let active = true;
+    loadCurrent(tab)
+      .then(next => { if (active) setItems(next); })
+      .catch(e => {
+        if (!active) return;
+        setItems([]);
+        setError(e instanceof Error ? e.message : 'Unable to load customer activity.');
+      });
+    return () => { active = false; };
+  },[tab,customer.id,token]);
+
+  async function add() {
+    if (!text.trim()) return;
+    try {
+      if (tab === 'Timeline') {
+        await apiRequest(`/api/customers/${customer.id}/follow-ups`,token,'POST',{note:text.trim()});
+      } else if (tab === 'Queries') {
+        await apiRequest(`/api/customers/${customer.id}/queries`,token,'POST',{subject:'Customer query',message:text.trim(),priority:'MEDIUM'});
+      } else {
+        await apiRequest(`/api/customers/${customer.id}/reviews`,token,'POST',{rating:Number(rating),review:text.trim()});
+      }
+      setText('');
+      setError('');
+      setItems(await loadCurrent());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to save customer activity.');
+    }
+  }
+
+  const label = tab === 'Queries' ? 'query' : tab === 'Reviews' ? 'review' : 'follow-up';
+  return <section className="detail-card">
+    <p className="eyebrow">CUSTOMER PROFILE</p>
+    <h2>{customer.customerName}</h2>
+    <p className="muted">{customer.businessName} · {customer.mobile}</p>
+    <div className="tabs">{['Timeline','Queries','Reviews'].map(t=><button className={tab===t?'selected':''} onClick={()=>setTab(t)} key={t}>{t}</button>)}</div>
+    {error&&<p className="error">{error}</p>}
+    <div className="detail-list">
+      {items.map((item:any)=><article key={item.id}>
+        <div><b>{tab==='Queries' ? item.subject : tab==='Reviews' ? `${'★'.repeat(Number(item.rating)||0)} review` : 'Follow-up note'}</b><small>{item.createdAt?new Date(item.createdAt).toLocaleString():''}</small></div>
+        <p>{tab==='Timeline' ? item.note : tab==='Queries' ? item.message : item.review}</p>
+        {tab==='Queries'&&item.status!=='RESOLVED'&&<button onClick={async()=>{try{await apiRequest(`/api/customers/${customer.id}/queries/${item.id}/resolve`,token,'PATCH');setItems(await loadCurrent('Queries'));}catch(e){setError(e instanceof Error?e.message:'Unable to resolve query.')}}}>Resolve query</button>}
+      </article>)}
+      {items.length===0&&<p className="muted">No {label}s recorded yet.</p>}
+    </div>
+    <div className="composer">
+      {tab==='Reviews'&&<select value={rating} onChange={e=>setRating(e.target.value)}><option value="5">5 stars</option><option value="4">4 stars</option><option value="3">3 stars</option><option value="2">2 stars</option><option value="1">1 star</option></select>}
+      <textarea value={text} onChange={e=>setText(e.target.value)} placeholder={tab==='Queries'?'Log a customer question or request...':tab==='Reviews'?'Write a customer review...':'Log a follow-up note...'}/>
+      <button className="new-button" onClick={add}>{tab==='Queries'?'Log query':tab==='Reviews'?'Add review':'Add note'}</button>
+    </div>
+  </section>;
+}
 
 function Products({token}:{token:string}) { const [rows,setRows]=useState<Product[]>([]);const [search,setSearch]=useState('');const [show,setShow]=useState(false);const load=()=>api<{data:Product[]}>(`/api/products?limit=100&search=${encodeURIComponent(search)}`,token).then(r=>setRows(r.data));useEffect(()=>{const timer=window.setTimeout(load,180);return()=>window.clearTimeout(timer)},[search]);return <div className="workspace-page"><div className="toolbar"><label className="search toolbar-search"><Search size={16}/><input aria-label="Search products" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name, SKU, category"/></label><button className="new-button" onClick={()=>setShow(true)}>+ Add product</button></div><section className="data-card"><div className="data-card-title"><div><p className="eyebrow">CATALOGUE CONTROL</p><h2>Products & inventory</h2></div><span>{rows.length} products</span></div><div className="data-head"><span>Product</span><span>SKU / category</span><span>Stock</span><span>Status</span></div>{rows.map(r=><div className="data-row" key={r.id}><b>{r.productName}<small>{r.warehouseLocation}</small></b><span>{r.sku}<small>{r.category}</small></span><span>{r.currentStock} units</span><span className={`status ${r.isLowStock?'attention':'confirmed'}`}>{r.isLowStock?'Low stock':'Healthy'}</span></div>)}{rows.length===0&&<p className="muted">No products match “{search}”.</p>}</section>{show&&<ProductForm token={token} close={()=>setShow(false)} saved={()=>{setShow(false);load()}}/>}</div> }
 function ProductForm({token,close,saved}:{token:string;close:()=>void;saved:()=>void}) {const [form,setForm]=useState({productName:'',sku:'',category:'',unitPrice:'',currentStock:'0',minimumStockAlertQuantity:'0',warehouseLocation:''});const [error,setError]=useState('');const set=(k:string,v:string)=>setForm({...form,[k]:v});return <Modal title="Add product" close={close}><form className="form-grid" onSubmit={e=>{e.preventDefault();apiRequest('/api/products',token,'POST',{...form,unitPrice:Number(form.unitPrice),currentStock:Number(form.currentStock),minimumStockAlertQuantity:Number(form.minimumStockAlertQuantity)}).then(saved).catch(e=>setError(e instanceof Error?e.message:'Unable to save product'))}}>{[['productName','Product name'],['sku','SKU'],['category','Category'],['unitPrice','Unit price'],['currentStock','Opening stock'],['minimumStockAlertQuantity','Minimum stock'],['warehouseLocation','Warehouse location']].map(([k,l])=><label key={k}>{l}<input required value={(form as any)[k]} onChange={e=>set(k,e.target.value)}/></label>)}{error&&<p className="error wide">{error}</p>}<div className="form-actions wide"><button type="button" onClick={close}>Cancel</button><button className="new-button">Save product</button></div></form></Modal>}
