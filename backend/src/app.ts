@@ -12,6 +12,7 @@ import { customersRouter } from './routes/customers.routes.js';
 import { dashboardRouter } from './routes/dashboard.routes.js';
 import { productsRouter } from './routes/products.routes.js';
 import { notificationsRouter } from './routes/notifications.routes.js';
+import { stockRequestsRouter } from './routes/stock-requests.routes.js';
 
 export const app = express();
 
@@ -37,6 +38,7 @@ app.use('/api/challans', challansRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api/stock-requests', stockRequestsRouter);
 
 app.use(notFound);
 app.use(errorHandler);

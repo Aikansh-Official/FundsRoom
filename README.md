@@ -196,6 +196,7 @@ npm.cmd run db:setup
 npm.cmd run db:crm
 npm.cmd run db:notifications
 npm.cmd run db:crm-replies
+npm.cmd run db:stock-requests
 npm.cmd run db:seed
 npm.cmd run db:demo-history
 ```
@@ -209,6 +210,7 @@ What each command does:
 | `db:crm` | Adds customer queries and reviews. |
 | `db:notifications` | Adds the persisted notification inbox table. |
 | `db:crm-replies` | Adds the customer-query reply thread table. |
+| `db:stock-requests` | Adds Sales-to-Warehouse stock requests and approval tracking. |
 | `db:seed` | Adds the four demo accounts and starter catalogue data. |
 | `db:demo-history` | Adds ten days of repeat-safe sales, stock movements, queries, and reviews. |
 
@@ -251,7 +253,7 @@ All seeded demo accounts use the password `FundsRoom@123`.
 | --- | --- | --- |
 | `admin@stockflow.test` | Admin | Operational oversight, query resolution, approvals, and full read access. |
 | `sales@stockflow.test` | Sales | Customers, incoming queries, customer replies/feedback, drafts, and challan confirmation. |
-| `warehouse@stockflow.test` | Warehouse | Products and stock receipt or adjustment workflows. |
+| `warehouse@stockflow.test` | Warehouse | Products, stock receipts or adjustments, Sales stock-request approvals, challans, and movement notes. |
 | `accounts@stockflow.test` | Accounts | Sales review, challan viewing, PDF, and CSV export. |
 
 These credentials are for local demonstration only.

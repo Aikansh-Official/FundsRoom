@@ -17,6 +17,8 @@ This document describes who can use each part of the portal and the controls tha
 | View product catalogue and stock levels | Yes | Yes | Yes | No |
 | Create/update products | Yes | No | Yes | No |
 | Record stock movements | Yes | No | Yes | No |
+| Request stock for a product | No | Yes | No | No |
+| Approve or reject Sales stock requests | Yes | No | Yes | No |
 | View challans | Yes | Yes | Yes | Yes |
 | Create, confirm, or cancel challans | Yes | Yes | No | No |
 | Download challan PDFs and sales CSV | Yes | Yes | No | Yes |
