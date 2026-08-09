@@ -57,6 +57,11 @@
   .workspace-grid .data-card, .workspace-grid .detail-card { width: 100%; }
 }
 
+/* Keep account actions visible while the main workspace grows. The navigation
+   becomes the scrollable region instead of pushing the profile below the fold. */
+.sidebar { position: sticky; top: 0; height: 100vh; max-height: 100vh; overflow: hidden; align-self: flex-start; }
+.sidebar nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+
 @media (max-width: 760px) {
   .login-page { grid-template-columns: 1fr; }
   .login-copy { min-height: 42vh; padding: 42px 30px; }
@@ -114,3 +119,7 @@
   .user-bar strong { grid-column: 2; grid-row: 1; }
   .chart-tooltip { width: 220px; }
 }
+
+/* Keep daily-sales hover details inside the chart instead of clipping them
+   above the card heading when the chart itself scrolls horizontally. */
+.bar-chart .chart-tooltip { top: 8px; bottom: auto; }
