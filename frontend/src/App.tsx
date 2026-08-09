@@ -10,7 +10,7 @@ type Analytics = { data: { days: number; daily: Array<{ saleDate: string; challa
 type Notification = { id: string; type: string; title: string; detail: string; priority: string; readAt: string | null; createdAt: string };
 
 const nav = [{ label: 'Overview', icon: LayoutDashboard }, { label: 'Customers', icon: Users }, { label: 'Products', icon: Package }, { label: 'Stock movements', icon: Boxes }, { label: 'Challans', icon: ClipboardList }];
-const money = (value: number) => `INR ${Number(value).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+const money = (value: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(value));
 
 export function App() {
   const [session, setSession] = useState<Session | null>(() => { const raw = localStorage.getItem('stockflow-session'); return raw ? JSON.parse(raw) : null; });
