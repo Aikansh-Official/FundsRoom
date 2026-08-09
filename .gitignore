@@ -1,0 +1,20 @@
+# Dependencies and build output
+backend/node_modules/
+backend/dist/
+frontend/node_modules/
+frontend/dist/
+
+# Local secrets
+backend/.env
+frontend/.env
+*.env.local
+
+# IDE and operating-system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local temporary material and assignment attachments
+tmp/
+*.pdf
