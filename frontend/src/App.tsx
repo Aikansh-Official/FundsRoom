@@ -59,20 +59,21 @@ export function App() {
   }
 
   useEffect(() => { refreshWorkspace(); const timer = window.setInterval(refreshWorkspace, 30000); return () => window.clearInterval(timer); }, [session]);
-  useEffect(() => { const expire = () => setSession(null); window.addEventListener('stockflow-auth-expired', expire); return () => window.removeEventListener('stockflow-auth-expired', expire); }, []);
-  if (!session) return <Login onSuccess={(next) => { localStorage.setItem('stockflow-session', JSON.stringify(next)); setSession(next); }} />;
+  useEffect(() => { const expire = () => { setActive('Overview'); setSession(null); }; window.addEventListener('stockflow-auth-expired', expire); return () => window.removeEventListener('stockflow-auth-expired', expire); }, []);
+  if (!session) return <Login onSuccess={(next) => { localStorage.setItem('stockflow-session', JSON.stringify(next)); setActive('Overview'); setSession(next); }} />;
   const visibleNav = nav.filter((item) => item.roles.includes(session.user.role));
+  const currentActive = active === 'Overview' || visibleNav.some((item) => item.label === active) ? active : 'Overview';
   const canCreateChallan = session.user.role === 'ADMIN' || session.user.role === 'SALES';
 
   return <main className="shell">
     <aside className="sidebar"><div className="brand"><span className="brand-mark">S</span><span>Stockflow</span></div><p className="workspace">OPERATIONS PORTAL</p>
-      <nav>{visibleNav.map(({ label, icon: Icon }) => <button key={label} aria-label={label} title={label} className={active === label ? 'nav-item active' : 'nav-item'} onClick={() => setActive(label)}><Icon size={18}/><span>{label}</span></button>)}</nav>
-      <div className="profile"><span className="avatar">{session.user.name[0]}</span><div><b>{session.user.name}</b><small>{session.user.role.toLowerCase()}</small></div><button aria-label="Sign out" onClick={() => { localStorage.removeItem('stockflow-session'); setSession(null); }}><LogOut size={17}/></button></div>
+      <nav>{visibleNav.map(({ label, icon: Icon }) => <button key={label} aria-label={label} title={label} className={currentActive === label ? 'nav-item active' : 'nav-item'} onClick={() => setActive(label)}><Icon size={18}/><span>{label}</span></button>)}</nav>
+      <div className="profile"><span className="avatar">{session.user.name[0]}</span><div><b>{session.user.name}</b><small>{session.user.role.toLowerCase()}</small></div><button aria-label="Sign out" onClick={() => { localStorage.removeItem('stockflow-session'); setActive('Overview'); setShowChallan(false); setShowNotifications(false); setSession(null); }}><LogOut size={17}/></button></div>
     </aside>
-    <section className="content"><header><div><p className="eyebrow">Good morning, {session.user.name.split(' ')[0]}</p><h1>{active === 'Overview' ? 'Operations at a glance' : active}</h1></div><div className="header-actions"><div className="notification-wrap"><button className="icon-button" aria-label={`Notifications${unreadCount ? ` (${unreadCount} unread)` : ''}`} aria-expanded={showNotifications} onClick={() => setShowNotifications((shown) => !shown)}><Bell size={19}/>{unreadCount > 0 && <i/>}</button>{showNotifications && <NotificationPanel notifications={notifications} unreadCount={unreadCount} token={session.token} close={() => setShowNotifications(false)} refresh={refreshWorkspace} />}</div>{canCreateChallan && <button className="new-button" onClick={() => setShowChallan(true)}>+ New challan</button>}</div></header>
+    <section className="content"><header><div><p className="eyebrow">Good morning, {session.user.name.split(' ')[0]}</p><h1>{currentActive === 'Overview' ? 'Operations at a glance' : currentActive}</h1></div><div className="header-actions"><div className="notification-wrap"><button className="icon-button" aria-label={`Notifications${unreadCount ? ` (${unreadCount} unread)` : ''}`} aria-expanded={showNotifications} onClick={() => setShowNotifications((shown) => !shown)}><Bell size={19}/>{unreadCount > 0 && <i/>}</button>{showNotifications && <NotificationPanel notifications={notifications} unreadCount={unreadCount} token={session.token} close={() => setShowNotifications(false)} refresh={refreshWorkspace} />}</div>{canCreateChallan && <button className="new-button" onClick={() => setShowChallan(true)}>+ New challan</button>}</div></header>
       {error && <p className="error">{error}</p>}
-      {active === 'Overview' && <DashboardView dashboard={dashboard} analytics={analytics} token={session.token} onNavigate={setActive} />}
-      {active !== 'Overview' && <Workspace section={active} token={session.token} role={session.user.role} />}
+      {currentActive === 'Overview' && <DashboardView dashboard={dashboard} analytics={analytics} token={session.token} onNavigate={setActive} />}
+      {currentActive !== 'Overview' && <Workspace section={currentActive} token={session.token} role={session.user.role} />}
       {showChallan && canCreateChallan && <NewChallan token={session.token} onClose={() => setShowChallan(false)} onCreated={() => { setShowChallan(false); refreshWorkspace(); }} />}
     </section>
   </main>;

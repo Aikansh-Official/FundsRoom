@@ -195,6 +195,7 @@ npm.cmd run db:create
 npm.cmd run db:setup
 npm.cmd run db:crm
 npm.cmd run db:notifications
+npm.cmd run db:crm-replies
 npm.cmd run db:seed
 npm.cmd run db:demo-history
 ```
@@ -207,6 +208,7 @@ What each command does:
 | `db:setup` | Creates the core users, customers, products, stock, challan, and item tables. |
 | `db:crm` | Adds customer queries and reviews. |
 | `db:notifications` | Adds the persisted notification inbox table. |
+| `db:crm-replies` | Adds the customer-query reply thread table. |
 | `db:seed` | Adds the four demo accounts and starter catalogue data. |
 | `db:demo-history` | Adds ten days of repeat-safe sales, stock movements, queries, and reviews. |
 
@@ -247,8 +249,8 @@ All seeded demo accounts use the password `FundsRoom@123`.
 
 | Email | Role | Main responsibilities |
 | --- | --- | --- |
-| `admin@stockflow.test` | Admin | Full operational access. |
-| `sales@stockflow.test` | Sales | Customers, CRM activity, drafts, and challan confirmation. |
+| `admin@stockflow.test` | Admin | Operational oversight, query resolution, approvals, and full read access. |
+| `sales@stockflow.test` | Sales | Customers, incoming queries, customer replies/feedback, drafts, and challan confirmation. |
 | `warehouse@stockflow.test` | Warehouse | Products and stock receipt or adjustment workflows. |
 | `accounts@stockflow.test` | Accounts | Sales review, challan viewing, PDF, and CSV export. |
 

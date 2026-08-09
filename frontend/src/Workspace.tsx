@@ -24,12 +24,14 @@ function Customers({ token, role }: {token:string; role:Role}) {
 
 function CustomerForm({token,close,saved}:{token:string;close:()=>void;saved:()=>void}) { const [form,setForm]=useState({customerName:'',businessName:'',mobile:'',email:'',customerType:'WHOLESALE',status:'LEAD',address:'',gstNumber:'',followUpDate:''}); const [error,setError]=useState(''); const set=(key:string,value:string)=>setForm({...form,[key]:value}); async function submit(e:React.FormEvent){e.preventDefault();try{await apiRequest('/api/customers',token,'POST',{...form,email:form.email||null,gstNumber:form.gstNumber||null,followUpDate:form.followUpDate||null});saved()}catch(err){setError(err instanceof Error?err.message:'Unable to save customer')}} return <Modal title="Add customer" close={close}><form className="form-grid" onSubmit={submit}>{[['customerName','Customer name'],['businessName','Business name'],['mobile','Mobile'],['email','Email'],['gstNumber','GST number'],['followUpDate','Follow-up date']].map(([key,label])=><label key={key}>{label}<input type={key==='followUpDate'?'date':key==='email'?'email':'text'} value={(form as any)[key]} onChange={e=>set(key,e.target.value)}/></label>)}<label>Customer type<select value={form.customerType} onChange={e=>set('customerType',e.target.value)}><option>RETAIL</option><option>WHOLESALE</option><option>DISTRIBUTOR</option></select></label><label>Status<select value={form.status} onChange={e=>set('status',e.target.value)}><option>LEAD</option><option>ACTIVE</option><option>INACTIVE</option></select></label><label className="wide">Address<textarea required value={form.address} onChange={e=>set('address',e.target.value)}/></label>{error&&<p className="error wide">{error}</p>}<div className="form-actions wide"><button type="button" onClick={close}>Cancel</button><button className="new-button">Save customer</button></div></form></Modal> }
 
-function CustomerDetail({customer,token}:{customer:Customer;token:string}) {
+function CustomerDetail({customer,token,role}:{customer:Customer;token:string;role?:Role}) {
+  const userRole:Role = role ?? (()=>{ try { return (JSON.parse(localStorage.getItem('stockflow-session') ?? '{}').user?.role ?? 'SALES') as Role; } catch { return 'SALES'; } })();
   const [tab,setTab]=useState('Timeline');
   const [items,setItems]=useState<any[]>([]);
   const [text,setText]=useState('');
   const [rating,setRating]=useState('5');
   const [error,setError]=useState('');
+  const [replyToId,setReplyToId]=useState<string|null>(null);
 
   const pathFor = (currentTab:string) => currentTab === 'Queries'
     ? `/api/customers/${customer.id}/queries`
@@ -49,6 +51,7 @@ function CustomerDetail({customer,token}:{customer:Customer;token:string}) {
     setItems([]);
     setError('');
     setText('');
+    setReplyToId(null);
     let active = true;
     loadCurrent(tab)
       .then(next => { if (active) setItems(next); })
@@ -66,11 +69,13 @@ function CustomerDetail({customer,token}:{customer:Customer;token:string}) {
       if (tab === 'Timeline') {
         await apiRequest(`/api/customers/${customer.id}/follow-ups`,token,'POST',{note:text.trim()});
       } else if (tab === 'Queries') {
-        await apiRequest(`/api/customers/${customer.id}/queries`,token,'POST',{subject:'Customer query',message:text.trim(),priority:'MEDIUM'});
+        if (replyToId) await apiRequest(`/api/customers/${customer.id}/queries/${replyToId}/replies`,token,'POST',{message:text.trim()});
+        else await apiRequest(`/api/customers/${customer.id}/queries`,token,'POST',{subject:'Customer query',message:text.trim(),priority:'MEDIUM'});
       } else {
         await apiRequest(`/api/customers/${customer.id}/reviews`,token,'POST',{rating:Number(rating),review:text.trim()});
       }
       setText('');
+      setReplyToId(null);
       setError('');
       setItems(await loadCurrent());
     } catch (e) {
@@ -89,15 +94,19 @@ function CustomerDetail({customer,token}:{customer:Customer;token:string}) {
       {items.map((item:any)=><article key={item.id}>
         <div><b>{tab==='Queries' ? item.subject : tab==='Reviews' ? `${'★'.repeat(Number(item.rating)||0)} review` : 'Follow-up note'}</b><small>{item.createdAt?new Date(item.createdAt).toLocaleString():''}</small></div>
         <p>{tab==='Timeline' ? item.note : tab==='Queries' ? item.message : item.review}</p>
-        {tab==='Queries'&&item.status!=='RESOLVED'&&<button onClick={async()=>{try{await apiRequest(`/api/customers/${customer.id}/queries/${item.id}/resolve`,token,'PATCH');setItems(await loadCurrent('Queries'));}catch(e){setError(e instanceof Error?e.message:'Unable to resolve query.')}}}>Resolve query</button>}
+        {tab==='Queries'&&item.replies?.map((reply:any)=><div className="query-reply" key={reply.id}><b>Reply from {reply.createdBy}</b><small>{reply.createdAt?new Date(reply.createdAt).toLocaleString():''}</small><p>{reply.message}</p></div>)}
+        {tab==='Queries'&&item.status!=='RESOLVED'&&<div className="query-actions">{userRole==='SALES'&&<button onClick={()=>{setReplyToId(item.id);setText('')}}>Reply</button>}{(userRole==='ADMIN'||userRole==='SALES')&&<button onClick={async()=>{try{await apiRequest(`/api/customers/${customer.id}/queries/${item.id}/resolve`,token,'PATCH');setItems(await loadCurrent('Queries'));}catch(e){setError(e instanceof Error?e.message:'Unable to resolve query.')}}}>Resolve query</button>}</div>}
       </article>)}
       {items.length===0&&<p className="muted">No {label}s recorded yet.</p>}
     </div>
-    <div className="composer">
+    {tab==='Queries'&&userRole==='ADMIN'&&<p className="muted workflow-note">Sales records incoming questions and sends replies. Admin reviews the thread and resolves it when complete.</p>}
+    {tab==='Reviews'&&userRole!=='SALES'&&<p className="muted workflow-note">Reviews are recorded by Sales after customer feedback is received.</p>}
+    {(tab==='Timeline'||(tab==='Queries'&&userRole==='SALES')||(tab==='Reviews'&&userRole==='SALES'))&&<div className="composer">
       {tab==='Reviews'&&<select value={rating} onChange={e=>setRating(e.target.value)}><option value="5">5 stars</option><option value="4">4 stars</option><option value="3">3 stars</option><option value="2">2 stars</option><option value="1">1 star</option></select>}
-      <textarea value={text} onChange={e=>setText(e.target.value)} placeholder={tab==='Queries'?'Log a customer question or request...':tab==='Reviews'?'Write a customer review...':'Log a follow-up note...'}/>
-      <button className="new-button" onClick={add}>{tab==='Queries'?'Log query':tab==='Reviews'?'Add review':'Add note'}</button>
-    </div>
+      {tab==='Queries'&&replyToId&&<button type="button" className="text-button" onClick={()=>{setReplyToId(null);setText('')}}>Cancel reply</button>}
+      <textarea value={text} onChange={e=>setText(e.target.value)} placeholder={tab==='Queries'?(replyToId?'Write a reply to this customer question...':'Log an incoming customer question...'):tab==='Reviews'?'Record feedback received from the customer...':'Log a follow-up note...'}/>
+      <button className="new-button" onClick={add}>{tab==='Queries'?(replyToId?'Send reply':'Log incoming query'):tab==='Reviews'?'Record review':'Add note'}</button>
+    </div>}
   </section>;
 }
 

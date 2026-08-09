@@ -23,6 +23,7 @@ const followUpSchema = z.object({
   followUpDate: z.string().date().nullable().optional(),
 });
 const querySchema = z.object({ subject: z.string().trim().min(3).max(180), message: z.string().trim().min(3).max(3000), priority: z.enum(['LOW', 'MEDIUM', 'HIGH']).default('MEDIUM') });
+const replySchema = z.object({ message: z.string().trim().min(1).max(3000) });
 const reviewSchema = z.object({ rating: z.coerce.number().int().min(1).max(5), review: z.string().trim().min(3).max(2000) });
 
 export const customersRouter = Router();
@@ -105,13 +106,29 @@ customersRouter.post('/:customerId/follow-ups', requireRoles('ADMIN', 'SALES'), 
 
 customersRouter.get('/:customerId/queries', requireRoles('ADMIN', 'SALES'), async (req, res) => {
   const result = await query(`SELECT id, subject, message, status, priority, created_at AS "createdAt", resolved_at AS "resolvedAt" FROM customer_queries WHERE customer_id = $1 ORDER BY created_at DESC`, [req.params.customerId]);
-  return res.json({ data: result.rows });
+  const replies = await query(`SELECT r.id, r.query_id AS "queryId", r.message, r.created_at AS "createdAt", u.name AS "createdBy" FROM customer_query_replies r JOIN customer_queries q ON q.id = r.query_id JOIN users u ON u.id = r.created_by WHERE q.customer_id = $1 ORDER BY r.created_at ASC`, [req.params.customerId]);
+  const repliesByQuery = new Map<string, unknown[]>();
+  replies.rows.forEach((reply: any) => repliesByQuery.set(reply.queryId, [...(repliesByQuery.get(reply.queryId) ?? []), reply]));
+  return res.json({ data: result.rows.map((item: any) => ({ ...item, replies: repliesByQuery.get(item.id) ?? [] })) });
 });
 
-customersRouter.post('/:customerId/queries', requireRoles('ADMIN', 'SALES'), async (req, res) => {
+customersRouter.post('/:customerId/queries', requireRoles('SALES'), async (req, res) => {
   const input = querySchema.parse(req.body); const id = randomUUID();
+  const customer = await query('SELECT id FROM customers WHERE id = $1', [req.params.customerId]);
+  if (!customer.rows[0]) throw new HttpError(404, 'Customer not found.');
   await query(`INSERT INTO customer_queries (id, customer_id, subject, message, priority, created_by) VALUES ($1,$2,$3,$4,$5,$6)`, [id, req.params.customerId, input.subject, input.message, input.priority, req.user!.id]);
-  return res.status(201).json({ data: (await query(`SELECT id, subject, message, status, priority, created_at AS "createdAt" FROM customer_queries WHERE id = $1`, [id])).rows[0] });
+  return res.status(201).json({ data: { ...(await query(`SELECT id, subject, message, status, priority, created_at AS "createdAt" FROM customer_queries WHERE id = $1`, [id])).rows[0], replies: [] } });
+});
+
+customersRouter.post('/:customerId/queries/:queryId/replies', requireRoles('SALES'), async (req, res) => {
+  const input = replySchema.parse(req.body); const queryId = req.params.queryId;
+  const customerQuery = await query('SELECT id, status FROM customer_queries WHERE id = $1 AND customer_id = $2', [queryId, req.params.customerId]);
+  if (!customerQuery.rows[0]) throw new HttpError(404, 'Customer query not found.');
+  if (customerQuery.rows[0].status === 'RESOLVED') throw new HttpError(409, 'Resolved queries cannot receive new replies.');
+  const id = randomUUID();
+  await query('INSERT INTO customer_query_replies (id, query_id, message, created_by) VALUES ($1,$2,$3,$4)', [id, queryId, input.message, req.user!.id]);
+  await query(`UPDATE customer_queries SET status = 'IN_PROGRESS' WHERE id = $1 AND status = 'OPEN'`, [queryId]);
+  return res.status(201).json({ data: (await query(`SELECT r.id, r.query_id AS "queryId", r.message, r.created_at AS "createdAt", u.name AS "createdBy" FROM customer_query_replies r JOIN users u ON u.id = r.created_by WHERE r.id = $1`, [id])).rows[0] });
 });
 
 customersRouter.patch('/:customerId/queries/:queryId/resolve', requireRoles('ADMIN', 'SALES'), async (req, res) => {
@@ -125,8 +142,10 @@ customersRouter.get('/:customerId/reviews', requireRoles('ADMIN', 'SALES'), asyn
   return res.json({ data: result.rows });
 });
 
-customersRouter.post('/:customerId/reviews', requireRoles('ADMIN', 'SALES'), async (req, res) => {
+customersRouter.post('/:customerId/reviews', requireRoles('SALES'), async (req, res) => {
   const input = reviewSchema.parse(req.body); const id = randomUUID();
+  const customer = await query('SELECT id FROM customers WHERE id = $1', [req.params.customerId]);
+  if (!customer.rows[0]) throw new HttpError(404, 'Customer not found.');
   await query(`INSERT INTO customer_reviews (id, customer_id, rating, review, created_by) VALUES ($1,$2,$3,$4,$5)`, [id, req.params.customerId, input.rating, input.review, req.user!.id]);
   return res.status(201).json({ data: (await query(`SELECT id, rating, review, created_at AS "createdAt" FROM customer_reviews WHERE id = $1`, [id])).rows[0] });
 });

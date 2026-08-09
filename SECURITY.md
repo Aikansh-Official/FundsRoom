@@ -9,7 +9,11 @@ This document describes who can use each part of the portal and the controls tha
 | Sign in and view dashboard, analytics, alerts | Yes | Yes | Yes | Yes |
 | View and search customers | Yes | Yes | No | No |
 | Create/update customers | Yes | Yes | No | No |
-| Add follow-ups, queries, and reviews | Yes | Yes | No | No |
+| Add follow-ups | Yes | Yes | No | No |
+| Record incoming customer queries and customer feedback | No | Yes | No | No |
+| Reply to customer queries | No | Yes | No | No |
+| Resolve customer queries | Yes | Yes | No | No |
+| View customer queries and reviews | Yes | Yes | No | No |
 | View product catalogue and stock levels | Yes | Yes | Yes | No |
 | Create/update products | Yes | No | Yes | No |
 | Record stock movements | Yes | No | Yes | No |
