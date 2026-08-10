@@ -24,13 +24,18 @@ See [SECURITY.md](SECURITY.md) for the role-permission matrix, threat model, imp
 
 ## Deployment
 
-- [Live frontend on Vercel](https://frontend-mrr91ipay-aikanshkatiyar-gmailcoms-projects.vercel.app/)
-- [Backend deployment on Vercel](https://backend-8lgs3kexf-aikanshkatiyar-gmailcoms-projects.vercel.app/)
+- [Live application on Vercel](https://frontend-blue-alpha-fct23a2ryg.vercel.app/)
+- [Backend health check](https://backend-six-rust-46.vercel.app/health)
 - [GitHub repository](https://github.com/Aikansh-Official/FundsRoom)
+- [Investor demonstration script (PDF)](output/pdf/Investor-Demo-Script.pdf)
 
-The frontend is deployed and available at the link above. The backend deployment is ready for production environment variables, including a managed MySQL connection. A local MySQL server at `localhost` cannot be reached by Vercel serverless functions; set the backend's `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET`, and `CLIENT_ORIGIN` values in Vercel before enabling live sign-in.
+The frontend and Express API are deployed as separate Vercel projects behind stable public aliases. The API connects over verified TLS to a managed Aiven MySQL 8.4 database in Bangalore. Database credentials, the CA certificate, and the JWT signing secret are stored as sensitive Vercel environment variables and are not committed to this repository.
+
+The production deployment was verified end to end on August 10, 2026. The checks covered all four role logins, persisted dashboard data, Sales stock requests, Warehouse approval and automatic stock receipt, customer query replies and resolution, challan confirmation and stock deduction, notification read state, analytics, PDF generation, CSV export, and `403` permission boundaries.
 
 ## Screenshots
+
+![Login and test accounts](docs/screenshots/login-test-accounts.png)
 
 ![Sales overview](docs/screenshots/sales-overview.png)
 
@@ -39,6 +44,8 @@ The frontend is deployed and available at the link above. The backend deployment
 ![Warehouse overview](docs/screenshots/warehouse-overview.png)
 
 For a print-ready version with full-page screenshots and clickable links, see [README-FundsRoom.pdf](output/pdf/README-FundsRoom.pdf).
+
+For a timed 15- to 20-minute investor presentation with exact narration and screen actions, see the [FundsRoom investor demo script PDF](output/pdf/Investor-Demo-Script.pdf).
 
 ## Feature inventory
 
@@ -123,7 +130,9 @@ Express + TypeScript API
         |
         | mysql2 connection pool
         v
-Local MySQL database
+MySQL 8 database
+  - local MySQL for development
+  - managed Aiven MySQL for production
         |
         +-- users and roles
         +-- customers and CRM engagement
@@ -265,7 +274,7 @@ The API health check is available at [http://localhost:4000/health](http://local
 
 ## Demo accounts
 
-All seeded demo accounts use the password `FundsRoom@123`.
+All seeded test accounts use the password `FundsRoom@123`. The login page also displays these test credentials and fills the form when a role card is selected.
 
 | Email | Role | Main responsibilities |
 | --- | --- | --- |
@@ -274,7 +283,7 @@ All seeded demo accounts use the password `FundsRoom@123`.
 | `warehouse@stockflow.test` | Warehouse | Products, stock receipts or adjustments, Sales stock-request approvals, challans, and movement notes. |
 | `accounts@stockflow.test` | Accounts | Sales review, challan viewing, PDF, and CSV export. |
 
-These credentials are for local demonstration only.
+These credentials are for this demonstration project only and must be replaced or removed before adapting the system for real business data.
 
 ## REST API reference
 
@@ -548,15 +557,16 @@ Recommended manual checks:
 
 ## Deployment notes
 
-The local setup uses MySQL on `localhost`, but the application is not tied to local storage. For deployment:
+The local setup uses MySQL on `localhost`, while the live deployment uses managed Aiven MySQL over TLS. To reproduce the deployment:
 
-1. Create a managed MySQL 8 database.
+1. Create a managed MySQL 8 database and obtain its CA certificate.
 2. Set `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD` to the provider values.
 3. Set a strong production `JWT_SECRET`.
 4. Set `CLIENT_ORIGIN` to the deployed frontend URL.
-5. Run the database setup and migration scripts once against the managed database.
-6. Build the frontend with `npm run build`.
-7. Start the API with `npm run start` and serve the frontend `dist` directory through a static host.
+5. Set `DB_SSL=true` and store the base64-encoded CA certificate in `DB_SSL_CA_BASE64`.
+6. Run the database setup and migration scripts once against the managed database.
+7. Build the frontend with `npm run build`.
+8. Start the API with `npm run start` and serve the frontend `dist` directory through a static host.
 
 The backend uses a connection pool and environment variables, so the database can move from a local MySQL service to a managed MySQL service without changing the application code.
 

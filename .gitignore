@@ -18,3 +18,5 @@ Thumbs.db
 # Local temporary material and assignment attachments
 tmp/
 *.pdf
+.playwright-cli/
+output/pdf/*.docx
